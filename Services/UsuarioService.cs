@@ -11,12 +11,15 @@ namespace ApiCentralDocsWeb.Services
         private readonly AppDbContext _context;
         private readonly ITokenService _tokenService;
 
-        public UsuarioService(AppDbContext context, ITokenService tokenService)
+        public UsuarioService(
+            AppDbContext context,
+            ITokenService tokenService)
         {
             _context = context;
             _tokenService = tokenService;
         }
 
+        // Converte Usuario para UsuarioDTO
         private static UsuarioDTO ParaDTO(Usuario usuario)
         {
             return new UsuarioDTO
@@ -30,18 +33,23 @@ namespace ApiCentralDocsWeb.Services
             };
         }
 
+        // Buscar todos os usuários
         public async Task<List<UsuarioDTO>> GetAllUsuarios(int usuarioLogadoId)
         {
             var usuarios = await _context.Usuarios
                 .Where(u => u.Id == usuarioLogadoId)
                 .ToListAsync();
 
-            return usuarios.Select(ParaDTO).ToList();
+            return usuarios
+                .Select(ParaDTO)
+                .ToList();
         }
 
+        // Buscar usuário pelo ID
         public async Task<dynamic> GetUsuarioById(int id)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await _context.Usuarios
+                .FindAsync(id);
 
             if (usuario == null)
             {
@@ -59,6 +67,7 @@ namespace ApiCentralDocsWeb.Services
             };
         }
 
+        // Criar usuário
         public async Task<dynamic> CriarUsuario(CriarUsuarioDTO dados)
         {
             if (dados.Senha != dados.ConfirmarSenha)
@@ -69,19 +78,30 @@ namespace ApiCentralDocsWeb.Services
                     Mensagem = "As senhas não coincidem"
                 };
             }
+
             var usuarioExistente = await _context.Usuarios
-                .FirstOrDefaultAsync(usuario => usuario.CPF == dados.CPF || usuario.Email == dados.Email);
+                .FirstOrDefaultAsync(usuario =>
+                    usuario.CPF == dados.CPF ||
+                    usuario.Email == dados.Email);
 
             if (usuarioExistente != null)
             {
                 if (usuarioExistente.CPF == dados.CPF)
                 {
-                    return new { Erro = true, Mensagem = "CPF já cadastrado" };
+                    return new
+                    {
+                        Erro = true,
+                        Mensagem = "CPF já cadastrado"
+                    };
                 }
 
                 if (usuarioExistente.Email == dados.Email)
                 {
-                    return new { Erro = true, Mensagem = "E-mail já cadastrado" };
+                    return new
+                    {
+                        Erro = true,
+                        Mensagem = "E-mail já cadastrado"
+                    };
                 }
             }
 
@@ -94,101 +114,186 @@ namespace ApiCentralDocsWeb.Services
             };
 
             _context.Usuarios.Add(usuario);
+
             await _context.SaveChangesAsync();
 
-            return new { Erro = false, Usuario = ParaDTO(usuario) };
+            return new
+            {
+                Erro = false,
+                Usuario = ParaDTO(usuario)
+            };
         }
 
-        public async Task<dynamic> AtualizarUsuario(int id, AtualizarUsuarioDTO dados)
+        // Atualizar usuário
+        public async Task<dynamic> AtualizarUsuario(
+            int id,
+            AtualizarUsuarioDTO dados)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await _context.Usuarios
+                .FindAsync(id);
 
             if (usuario == null)
-                return new { Erro = true, Mensagem = "Usuário não encontrado" };
+            {
+                return new
+                {
+                    Erro = true,
+                    Mensagem = "Usuário não encontrado"
+                };
+            }
 
             usuario.Nome = dados.Nome;
             usuario.Email = dados.Email;
 
-            if (!string.IsNullOrEmpty(dados.Senha))
+            if (!string.IsNullOrWhiteSpace(dados.Senha))
             {
-                usuario.Senha = CryptoService.EncryptPassword(dados.Senha);
+                usuario.Senha =
+                    CryptoService.EncryptPassword(dados.Senha);
             }
 
             await _context.SaveChangesAsync();
 
-            return new { Erro = false, Usuario = ParaDTO(usuario) };
+            return new
+            {
+                Erro = false,
+                Usuario = ParaDTO(usuario)
+            };
         }
 
+        // Deletar usuário
         public async Task<dynamic> DeletarUsuario(int id)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await _context.Usuarios
+                .FindAsync(id);
 
             if (usuario == null)
-                return new { Erro = true, Mensagem = "Usuário não encontrado" };
+            {
+                return new
+                {
+                    Erro = true,
+                    Mensagem = "Usuário não encontrado"
+                };
+            }
 
             _context.Usuarios.Remove(usuario);
+
             await _context.SaveChangesAsync();
 
-            return new { Erro = false };
+            return new
+            {
+                Erro = false
+            };
         }
-        public async Task<dynamic> AlterarSenha(int id, AlterarSenhaDTO dados)
+
+        // Alterar senha
+        public async Task<dynamic> AlterarSenha(
+            int id,
+            AlterarSenhaDTO dados)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuario = await _context.Usuarios
+                .FindAsync(id);
 
             if (usuario == null)
-                return new { Erro = true, Mensagem = "Usuário não encontrado" };
+            {
+                return new
+                {
+                    Erro = true,
+                    Mensagem = "Usuário não encontrado"
+                };
+            }
 
-            bool senhaAtualValida = CryptoService.VerifyPassword(dados.SenhaAtual, usuario.Senha);
+            bool senhaAtualValida =
+                CryptoService.VerifyPassword(
+                    dados.SenhaAtual,
+                    usuario.Senha);
 
             if (!senhaAtualValida)
-                return new { Erro = true, Mensagem = "Senha atual incorreta" };
+            {
+                return new
+                {
+                    Erro = true,
+                    Mensagem = "Senha atual incorreta"
+                };
+            }
 
-            if (string.IsNullOrWhiteSpace(dados.NovaSenha) || dados.NovaSenha.Length < 6)
-                return new { Erro = true, Mensagem = "A nova senha deve ter pelo menos 6 caracteres" };
+            if (string.IsNullOrWhiteSpace(dados.NovaSenha) ||
+                dados.NovaSenha.Length < 6)
+            {
+                return new
+                {
+                    Erro = true,
+                    Mensagem =
+                        "A nova senha deve ter pelo menos 6 caracteres"
+                };
+            }
 
-            usuario.Senha = CryptoService.EncryptPassword(dados.NovaSenha);
+            usuario.Senha =
+                CryptoService.EncryptPassword(dados.NovaSenha);
+
             await _context.SaveChangesAsync();
 
-            return new { Erro = false, Mensagem = "Senha alterada com sucesso" };
+            return new
+            {
+                Erro = false,
+                Mensagem = "Senha alterada com sucesso"
+            };
         }
 
+        // Login
         public async Task<dynamic> Login(LoginDTO dados)
         {
             var usuario = await _context.Usuarios
                 .Include(u => u.Documentos)
-                    .ThenInclude(d => d.TipoDocumento)
-                .FirstOrDefaultAsync(u => u.Email == dados.Email);
+                .ThenInclude(d => d.TipoDocumento)
+                .FirstOrDefaultAsync(u =>
+                    u.Email == dados.Email);
 
             if (usuario == null)
             {
-                return new { Erro = true, Mensagem = "Email ou senha inválidos" };
+                return new
+                {
+                    Erro = true,
+                    Mensagem = "Email ou senha inválidos"
+                };
             }
 
-            bool senhaValida = CryptoService.VerifyPassword(dados.Senha, usuario.Senha);
+            bool senhaValida =
+                CryptoService.VerifyPassword(
+                    dados.Senha,
+                    usuario.Senha);
 
             if (!senhaValida)
             {
-                return new { Erro = true, Mensagem = "Email ou senha inválidos" };
+                return new
+                {
+                    Erro = true,
+                    Mensagem = "Email ou senha inválidos"
+                };
             }
 
-            var token = _tokenService.GerarToken(usuario);
+            var token =
+                _tokenService.GerarToken(usuario);
+
             return new
             {
                 Erro = false,
                 Token = token,
+
                 Usuario = new
                 {
                     usuario.Id,
                     usuario.Nome,
                     usuario.Email,
-                    Documentos = usuario.Documentos.Select(d => new
-                    {
-                        d.Id,
-                        d.Numero,
-                        d.OrgaoEmissor,
-                        d.CidadeEmissao,
-                        Tipo = d.TipoDocumento.Nome
-                    })
+
+                    Documentos =
+                        usuario.Documentos.Select(d => new
+                        {
+                            d.Id,
+                            d.Numero,
+                            d.OrgaoEmissor,
+                            d.CidadeEmissao,
+
+                            Tipo = d.TipoDocumento.Nome
+                        })
                 }
             };
         }
