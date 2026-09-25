@@ -1,5 +1,9 @@
 using ApiCentralDocsWeb.Data;
+using ApiCentralDocsWeb.Interfaces;
+using ApiCentralDocsWeb.Services;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.IdentityModel.Tokens;
 using Scalar.AspNetCore;
 
 namespace ApiCentralDocsWeb
@@ -19,6 +23,16 @@ namespace ApiCentralDocsWeb
             // Learn more about configuring OpenAPI at https://aka.ms/aspnet/openapi
             builder.Services.AddOpenApi();
 
+            builder.Services.AddCors(options =>
+            {
+                options.AddPolicy("PermitirTudo", policy =>
+                {
+                    policy.AllowAnyOrigin()
+                          .AllowAnyHeader()
+                          .AllowAnyMethod();
+                });
+            });
+
             var app = builder.Build();
 
             // Configure the HTTP request pipeline.
@@ -30,11 +44,11 @@ namespace ApiCentralDocsWeb
 
             app.UseHttpsRedirection();
 
+            app.UseAuthentication();
             app.UseAuthorization();
 
-
             app.MapControllers();
-
+            app.MapGet("/", () => "API CentralDocs está online!");
             app.Run();
         }
     }

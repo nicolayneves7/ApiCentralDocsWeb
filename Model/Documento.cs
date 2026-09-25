@@ -1,5 +1,6 @@
 ﻿using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
+using System.Text.Json.Serialization;
 
 namespace ApiCentralDocsWeb.Model
 {
@@ -17,17 +18,21 @@ namespace ApiCentralDocsWeb.Model
         public DateTime DataEmissao { get; set; }
 
         public string CidadeEmissao { get; set; } = string.Empty;
+        public bool Ativo { get; set; } = true;
 
-        // relacionamento com Usuario
         [ForeignKey("Usuario")]
         public int UsuarioId { get; set; }
 
+
+        [JsonIgnore]
+
         public Usuario? Usuario { get; set; }
 
-        // relacionamento com TipoDocumento
         [ForeignKey("TipoDocumento")]
         public int TipoDocumentoId { get; set; }
 
         public TipoDocumento? TipoDocumento { get; set; }
+
+        public List<Foto> Fotos { get; set; } = new();
     }
 }

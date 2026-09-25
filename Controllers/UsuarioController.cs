@@ -1,41 +1,65 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore;
-using ApiCentralDocsWeb.Data;
+using Microsoft.AspNetCore.Authorization;
 using ApiCentralDocsWeb.Model;
 using ApiCentralDocsWeb.Model.DTO;
+using ApiCentralDocsWeb.Services;
+using System.Security.Claims;
 
 namespace ApiCentralDocsWeb.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
+    [Authorize]
     public class UsuarioController : ControllerBase
     {
-        private readonly CentralDocsContext _context;
+        private readonly UsuarioService _usuarioService;
 
-        public UsuarioController(CentralDocsContext context)
+        public UsuarioController(UsuarioService usuarioService)
         {
-            _context = context;
+            _usuarioService = usuarioService;
+        }
+
+        private int? ObterUsuarioIdLogado()
+        {
+            var claim = User.FindFirst(ClaimTypes.NameIdentifier) ?? User.FindFirst("sub");
+            if (claim != null && int.TryParse(claim.Value, out int id))
+            {
+                return id;
+            }
+            return null;
         }
 
         [HttpGet("GetAll")]
         public async Task<IActionResult> GetAllUsuarios()
         {
-            var usuarios = await _context.Usuarios.ToListAsync();
+            var usuarioLogadoId = ObterUsuarioIdLogado();
+
+            if (usuarioLogadoId == null)
+                return Unauthorized("Usuário não identificado no token.");
+
+            var usuarios = await _usuarioService.GetAllUsuarios(usuarioLogadoId.Value);
             return Ok(usuarios);
         }
 
-        [HttpGet("GetById{id}")]
+        [HttpGet("GetById/{id}")]
         public async Task<IActionResult> GetUsuarioById([FromRoute] int id)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuarioLogadoId = ObterUsuarioIdLogado();
+
+            if (usuarioLogadoId == null)
+                return Unauthorized("Usuário não identificado no token.");
+
+            if (usuarioLogadoId != id)
+                return Forbid();
+
+            var usuario = await _usuarioService.GetUsuarioById(id);
 
             if (usuario == null)
-
             {
                 return BadRequest(new
                 {
-                    Erro = true,
-                    Mensagem = $"Usuário com id {id} não encontrado"
+                    erro = true,
+                    mensagem = $"Usuário com id {id} não encontrado"
                 });
             }
 
@@ -43,63 +67,50 @@ namespace ApiCentralDocsWeb.Controllers
         }
 
         [HttpPost("CriarUsuario")]
+        [AllowAnonymous]
         public async Task<IActionResult> CriarUsuario([FromBody] CriarUsuarioDTO dadosUsuario)
         {
             if (!ModelState.IsValid)
-            {
                 return BadRequest(ModelState);
+
+            var resultado = await _usuarioService.CriarUsuario(dadosUsuario);
+
+            var propErro = resultado?.GetType().GetProperty("Erro");
+            if (propErro != null)
+            {
+                bool temErro = (bool)propErro.GetValue(resultado)!;
+                if (temErro)
+                    return BadRequest(resultado);
             }
 
-            var usuarioExistente = await _context.Usuarios
-                .FirstOrDefaultAsync(usuario => usuario.CPF == dadosUsuario.CPF);
-
-            if (usuarioExistente != null)
-            {
-                return BadRequest($"Já existe um usuário com CPF {dadosUsuario.CPF}");
-            }
-
-            Usuario usuario = new Usuario
-            {
-                Nome = dadosUsuario.Nome,
-                CPF = dadosUsuario.CPF,
-                Email = dadosUsuario.Email,
-                Senha = dadosUsuario.Senha
-            };
-
-            _context.Usuarios.Add(usuario);
-
-            int resultado = await _context.SaveChangesAsync();
-
-            if (resultado > 0)
-                return Created($"Usuario {usuario.Nome} criado com sucesso!", usuario);
-
-            return BadRequest("Erro ao criar usuário");
+            return Ok(resultado);
         }
+
         [HttpDelete("DeletarUsuario/{id}")]
         public async Task<IActionResult> DeletarUsuario([FromRoute] int id)
         {
-            var usuario = await _context.Usuarios.FindAsync(id);
+            var usuarioLogadoId = ObterUsuarioIdLogado();
 
-            if (usuario == null)
+            if (usuarioLogadoId == null)
+                return Unauthorized("Usuário não identificado no token.");
+
+            if (usuarioLogadoId != id)
+                return Forbid();
+
+            var resultado = await _usuarioService.DeletarUsuario(id);
+
+            var propErro = resultado?.GetType().GetProperty("Erro");
+            if (propErro != null)
             {
-                return BadRequest(new
-                {
-                    Erro = true,
-                    Mensagem = $"Usuário com id {id} não encontrado"
-                });
+                bool temErro = (bool)propErro.GetValue(resultado)!;
+                if (temErro)
+                    return BadRequest(resultado);
             }
 
-            _context.Usuarios.Remove(usuario);
-
-            int resultado = await _context.SaveChangesAsync();
-
-            if (resultado > 0)
-                return Ok(new
-                {
-                    Mensagem = $"Usuário com id {id} foi deletado com sucesso"
-                });
-
-            return BadRequest("Erro ao deletar usuário");
+            return Ok(new
+            {
+                mensagem = $"Usuário com id {id} foi deletado com sucesso"
+            });
         }
     }
 }
